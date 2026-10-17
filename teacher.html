@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>لوحة المدرس</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="ui.css">
+<style>
+.lay{display:grid;grid-template-columns:220px 1fr;gap:16px;max-width:1280px;margin:auto;padding:16px}
+.side{padding:14px;position:sticky;top:16px;align-self:start;display:flex;flex-direction:column;gap:6px}.side .logo{font-weight:900;font-size:18px;padding:6px 10px 12px}
+.side button{background:none;color:var(--mut);text-align:right;padding:9px 12px;border-radius:12px;font-weight:600;font-size:14px}.side button:hover{background:var(--glass);color:var(--tx)}.side button.on{background:var(--grad);color:#fff}
+.top{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px}.top h2{margin:0!important}
+.ln2{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}.ln2 small{color:var(--mut)}
+.acts{display:flex;gap:4px;flex-wrap:wrap}.chk{display:flex;flex-wrap:wrap;gap:6px 16px;margin-bottom:10px}.chk label{margin:0;display:flex;gap:6px;align-items:center}
+.tg{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:10px}.sw{height:64px;border-radius:14px;padding:4px;display:flex;align-items:flex-end}.sw span{width:100%;border-radius:10px;font-size:12px;font-weight:700;padding:2px 6px;text-align:center}
+.hb{display:flex;align-items:center;gap:10px;margin:8px 0;font-size:14px}.hb span{width:120px}.hb i{display:block;height:10px;border-radius:6px;background:var(--grad)}
+.lr{display:grid;gap:6px;padding:10px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px}
+.login{max-width:400px;margin:12vh auto;padding:30px;display:flex;flex-direction:column;gap:12px}
+@media(max-width:820px){.lay{grid-template-columns:1fr}.side{position:static;flex-direction:row;overflow:auto}.side .logo{display:none}}
+</style>
+</head>
+<body>
+<div id="app"></div><div id="md"></div><div id="toast"></div>
+<script src="themes.js"></script><script src="api.js"></script>
+<script>
+const $=s=>document.querySelector(s),app=$('#app'),md=$('#md'),DAY=API.DAY;
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove('show'),2600)};
+const D=t=>new Date(t).toISOString().slice(0,10),close=()=>md.innerHTML='';
+const PERMS={exams:'إنشاء الامتحانات',homework:'الواجبات',follow:'المتابعة والتقارير',students:'إدارة الطلاب',codes:'الأكواد',support:'دعم الطلاب'};
+const NEED={exams:'exams',homework:'homework',codes:'codes'};
+const TABS=[['ov','📊 الرئيسية'],['pf','🎓 صفحتي'],['cr','📚 الكورسات'],['st','👥 الطلاب'],['cd','🎟️ الأكواد','codes'],['rq','⏳ الطلبات'],['as','🧑‍🏫 المساعدون'],['an','📣 إعلانات'],['sg','⚙️ إعدادات']];
+let TN,tab='ov',LES=[],ST=[],CS=[];
+const C=n=>API.col(TN.id,n),has=f=>TN.features.includes(f);
+const nm=id=>(CS.find(c=>c.id===id)||{t:'—'}).t;
+
+async function boot(){TN=await API.tme();if(!TN)return loginView();applyTheme(getTheme(TN.themeId,TN.custom));render()}
+function loginView(){applyTheme(THEMES[0]);app.innerHTML=`<div class="glass login"><h2 class="st gt" style="text-align:center">لوحة المدرس</h2><input class="inp" id="e" placeholder="البريد الإلكتروني" style="direction:ltr"><input class="inp" id="p" type="password" placeholder="كلمة المرور"><button class="btn" onclick="login()">دخول</button></div>`;$('#p').onkeydown=e=>{if(e.key==='Enter')login()}}
+async function login(){const r=await API.tlogin($('#e').value.trim(),$('#p').value);if(r==='ok')return boot();toast({bad:'بيانات غير صحيحة',off:'المنصة موقوفة، تواصل مع الدعم',exp:'انتهى الاشتراك، تواصل مع الدعم'}[r])}
+async function out(){await API.tlogout();loginView()}
+function go(t){tab=t;render()}
+async function render(){TN=await API.tme();CS=await C('courses').list();const v=await V[tab]();
+ app.innerHTML=`<div class="lay"><aside class="glass side"><div class="logo gt">🎓 ${esc(TN.name)}</div>${TABS.filter(t=>!t[2]||has(t[2])).map(t=>`<button class="${tab===t[0]?'on':''}" onclick="go('${t[0]}')">${t[1]}</button>`).join('')}<button onclick="out()">🚪 خروج</button></aside><section>${v}</section></div>`}
+const V={};
+
+V.ov=async()=>{const [st,cd,rq,an]=await Promise.all([C('students').list(),C('codes').list(),C('reqs').list(),API.ann.list()]),left=Math.ceil((TN.expires-Date.now())/DAY);
+ return `<h2 class="st gt">أهلاً ${esc(TN.teacher)}</h2>${left<=14?`<div class="glass pn" style="border-color:var(--warn);margin-bottom:14px">⚠️ اشتراكك ينتهي خلال ${left} يوماً</div>`:''}
+<div class="kpis">${[['👥 الطلاب',st.length+' / '+TN.max],['📚 الكورسات',CS.length],['🎟️ أكواد متاحة',cd.filter(c=>!c.used).length],['⏳ طلبات معلّقة',(await C('reqs').list()).length]].map(k=>`<div class="glass kpi"><small>${k[0]}</small><b class="gt">${k[1]}</b></div>`).join('')}</div>
+<div class="two"><div class="glass pn"><h3>الطلاب في كل كورس</h3>${CS.map(c=>{const n=st.filter(s=>s.subs.includes(c.id)).length;return `<div class="hb"><span>${esc(c.t)}</span><i style="width:${Math.max(4,n/Math.max(1,st.length)*60)}%"></i><small>${n}</small></div>`}).join('')||'<p class="sub">أضف كورساً أولاً</p>'}</div>
+<div class="glass pn"><h3>إعلانات الإدارة</h3>${an.map(a=>`<div class="ln2"><span>${esc(a.x)}</span><small>${D(a.t)}</small></div>`).join('')||'<p class="sub">لا توجد</p>'}</div></div>`};
+
+V.pf=async()=>{const f=(k,l,d='')=>`<label>${l}<input class="inp" id="p_${k}" value="${esc(TN[k])}" ${d}></label>`;
+ return `<h2 class="st gt">صفحتي</h2><div class="two"><div class="glass pn"><h3>معلومات المدرس</h3>${f('name','اسم المنصة')}${f('teacher','اسم المدرس')}${f('subject','التخصص')}<label>نبذة عنك<textarea class="inp" id="p_bio" rows="4">${esc(TN.bio)}</textarea></label>${f('photo','رابط صورتك','style="direction:ltr"')}${f('wa','واتساب (بكود الدولة)','style="direction:ltr"')}${f('fb','فيسبوك','style="direction:ltr"')}${f('yt','يوتيوب','style="direction:ltr"')}${f('ig','انستجرام','style="direction:ltr"')}<button class="btn" onclick="savePf()">حفظ</button></div>
+<div class="glass pn" style="align-self:start"><h3>شكل المنصة (يُطبَّق فوراً)</h3><div class="tg">${THEMES.map(t=>`<button class="sw" onclick="pickT('${t.id}')" style="background:linear-gradient(135deg,${t.c1},${t.c2})"><span style="background:${t.bg};color:${t.m==='l'?'#222':'#fff'}">${t.n}</span></button>`).join('')}</div></div></div>`};
+async function savePf(){const d={};['name','teacher','subject','bio','photo','wa','fb','yt','ig'].forEach(k=>d[k]=$('#p_'+k).value.trim());if(!d.name||!d.teacher)return toast('اسم المنصة والمدرس مطلوبان');await API.tenants.update(TN.id,d);toast('تم الحفظ');render()}
+async function pickT(id){await API.tenants.update(TN.id,{themeId:id,custom:null});applyTheme(getTheme(id));toast('تم تغيير الثيم')}
+
+V.cr=async()=>`<div class="top"><h2 class="st gt">الكورسات</h2><button class="btn" onclick="cmodal()">+ كورس جديد</button></div><div class="glass pn tw"><table class="tbl"><tr><th>الكورس</th><th>الدروس</th><th>السعر</th><th>الحالة</th><th></th></tr>${CS.map(c=>`<tr><td>${esc(c.i)} <b>${esc(c.t)}</b></td><td>${c.lessons.length}</td><td>${c.p} ج</td><td><span class="pill ${c.status==='pub'?'on':'off'}">${c.status==='pub'?'منشور':'مسودة'}</span></td><td class="acts"><button class="btn s g" onclick="cmodal('${c.id}')">تعديل</button><button class="btn s d" onclick="delC('${c.id}')">حذف</button></td></tr>`).join('')||'<tr><td colspan="5" class="sub">لا توجد كورسات بعد</td></tr>'}</table></div>`;
+function cmodal(id){const c=id?CS.find(x=>x.id===id):{t:'',i:'📘',p:0,desc:'',status:'draft',lessons:[{n:'',v:'',f:''}]};LES=c.lessons.map(l=>({...l}));
+ md.innerHTML=`<div class="mb"><div class="glass pn mc" style="width:min(680px,100%)"><h3>${id?'تعديل كورس':'كورس جديد'}</h3><label>اسم الكورس<input class="inp" id="c_t" value="${esc(c.t)}"></label><div class="row"><label style="flex:1">أيقونة<input class="inp" id="c_i" value="${esc(c.i)}" maxlength="2"></label><label style="flex:1">السعر (ج)<input class="inp" id="c_p" type="number" value="${c.p}"></label><label style="flex:1">الحالة<select class="inp" id="c_s"><option value="draft" ${c.status==='draft'?'selected':''}>مسودة</option><option value="pub" ${c.status==='pub'?'selected':''}>منشور</option></select></label></div>
+ <label>وصف الكورس<textarea class="inp" id="c_d" rows="2">${esc(c.desc)}</textarea></label><h3>الدروس</h3><div id="les"></div><button class="btn g s" onclick="LES.push({n:'',v:'',f:''});lr()">+ درس</button>
+ <div class="row" style="margin-top:14px"><button class="btn" onclick="saveC('${id||''}')">حفظ</button><button class="btn g" onclick="close()">إلغاء</button></div></div></div>`;lr()}
+function lr(){$('#les').innerHTML=LES.map((l,i)=>`<div class="lr"><input class="inp" placeholder="عنوان الدرس" value="${esc(l.n)}" oninput="LES[${i}].n=this.value"><input class="inp" placeholder="رابط الفيديو (Embed أو mp4)" style="direction:ltr" value="${esc(l.v)}" oninput="LES[${i}].v=this.value"><input class="inp" placeholder="رابط ملف PDF (اختياري)" style="direction:ltr" value="${esc(l.f)}" oninput="LES[${i}].f=this.value"><div class="row"><button class="btn s g" onclick="mv(${i},-1)">↑</button><button class="btn s g" onclick="mv(${i},1)">↓</button><button class="btn s d" onclick="LES.splice(${i},1);lr()">حذف</button></div></div>`).join('')}
+function mv(i,d){const j=i+d;if(j<0||j>=LES.length)return;[LES[i],LES[j]]=[LES[j],LES[i]];lr()}
+async function saveC(id){const t=$('#c_t').value.trim();if(!t)return toast('اكتب اسم الكورس');
+ const d={t,i:$('#c_i').value||'📘',p:+$('#c_p').value||0,desc:$('#c_d').value.trim(),status:$('#c_s').value,lessons:LES.filter(l=>l.n.trim()).map(l=>({n:l.n.trim(),v:(l.v||'').trim(),f:(l.f||'').trim()}))};
+ if(id)await C('courses').update(id,d);else await C('courses').add(d);close();render();toast('تم حفظ الكورس')}
+async function delC(id){if(confirm('حذف الكورس؟')){await C('courses').remove(id);render()}}
+
+V.st=async()=>{ST=await C('students').list();return `<div class="top"><h2 class="st gt">الطلاب (${ST.length}/${TN.max})</h2><div class="row"><input class="inp" id="q" placeholder="🔍 بحث" style="width:190px" oninput="srows()"><button class="btn" onclick="smodal()">+ طالب</button></div></div><div class="glass pn tw"><table class="tbl"><thead><tr><th>الطالب</th><th>الهاتف</th><th>الكورسات</th><th>الحالة</th><th></th></tr></thead><tbody id="tb">${srows(1)}</tbody></table></div>`};
+function srows(r){const q=($('#q')||{value:''}).value.trim();const h=ST.filter(s=>s.name.includes(q)||s.phone.includes(q)).map(s=>`<tr><td><b>${esc(s.name)}</b><br><small class="sub">${esc(s.grade)}</small></td><td>${esc(s.phone)}</td><td>${s.subs.map(i=>esc(nm(i))).join('، ')||'—'}</td><td><span class="pill ${s.ban?'off':'on'}">${s.ban?'موقوف':'نشط'}</span></td><td class="acts"><button class="btn s g" onclick="subm('${s.id}')">الكورسات</button><button class="btn s g" onclick="upS('${s.id}',{ban:${!s.ban}})">${s.ban?'تفعيل':'إيقاف'}</button><button class="btn s g" onclick="upS('${s.id}',{tok:''});toast('تم تصفير الجهاز')">🔄 جهاز</button><button class="btn s d" onclick="delS('${s.id}')">حذف</button></td></tr>`).join('')||'<tr><td colspan="5" class="sub">لا يوجد طلاب</td></tr>';if(r)return h;$('#tb').innerHTML=h}
+async function upS(id,d){await C('students').update(id,d);render()}
+async function delS(id){if(confirm('حذف الطالب؟')){await C('students').remove(id);render()}}
+function subm(id){const s=ST.find(x=>x.id===id);md.innerHTML=`<div class="mb"><div class="glass pn mc"><h3>اشتراكات ${esc(s.name)}</h3><div class="chk" style="flex-direction:column">${CS.map(c=>`<label><input type="checkbox" class="sc" value="${c.id}" ${s.subs.includes(c.id)?'checked':''}> ${esc(c.t)}</label>`).join('')||'<span class="sub">لا توجد كورسات</span>'}</div><div class="row"><button class="btn" onclick="saveSub('${id}')">حفظ</button><button class="btn g" onclick="close()">إلغاء</button></div></div></div>`}
+async function saveSub(id){await C('students').update(id,{subs:[...document.querySelectorAll('.sc:checked')].map(c=>c.value)});close();render()}
+function smodal(){if(ST.length>=TN.max)return toast('وصلت للحد الأقصى للطلاب في باقتك');md.innerHTML=`<div class="mb"><div class="glass pn mc"><h3>إضافة طالب</h3><label>الاسم<input class="inp" id="s_n"></label><label>الهاتف<input class="inp" id="s_p" inputmode="numeric"></label><label>الصف<select class="inp" id="s_g"><option>الأول الثانوي</option><option>الثاني الثانوي</option><option>الثالث الثانوي</option></select></label><div class="row"><button class="btn" onclick="addS()">إضافة</button><button class="btn g" onclick="close()">إلغاء</button></div></div></div>`}
+async function addS(){const n=$('#s_n').value.trim(),p=$('#s_p').value.trim();if(n.length<3)return toast('اكتب الاسم');if(!/^01[0125]\d{8}$/.test(p))return toast('رقم هاتف غير صحيح');if(ST.some(s=>s.phone===p))return toast('الرقم مسجل');
+ const pass=API.rnd(6);await C('students').add({name:n,phone:p,grade:$('#s_g').value,pass,subs:[],prog:{},att:[],tok:'',ban:false});close();await render();md.innerHTML=`<div class="mb"><div class="glass pn mc"><h3>تم إنشاء الحساب</h3><div class="ln2">الهاتف<b>${esc(p)}</b></div><div class="ln2">كلمة المرور<b style="direction:ltr;user-select:text">${esc(pass)}</b></div><br><button class="btn" onclick="close()">تم</button></div></div>`}
+
+V.cd=async()=>{const cd=await C('codes').list();return `<h2 class="st gt">أكواد الاشتراك</h2><div class="glass pn" style="margin-bottom:14px"><div class="row"><select class="inp" id="g_c" style="flex:2">${CS.map(c=>`<option value="${c.id}">${esc(c.t)}</option>`).join('')}</select><input class="inp" id="g_q" type="number" min="1" max="100" value="10" style="flex:1"><button class="btn" onclick="gen()">توليد</button><button class="btn g" onclick="cpy()">نسخ المتاح</button></div></div>
+<div class="glass pn tw"><table class="tbl"><tr><th>الكود</th><th>الكورس</th><th>الحالة</th></tr>${cd.slice().reverse().map(c=>`<tr><td style="direction:ltr;text-align:right;user-select:text"><b>${c.code}</b></td><td>${esc(nm(c.cid))}</td><td><span class="pill ${c.used?'off':'on'}">${c.used?'مستخدم':'متاح'}</span></td></tr>`).join('')||'<tr><td colspan="3" class="sub">لا توجد أكواد</td></tr>'}</table></div>`};
+async function gen(){const cid=$('#g_c').value;if(!cid)return toast('أضف كورساً أولاً');const n=Math.min(100,Math.max(1,+$('#g_q').value||1));for(let i=0;i<n;i++)await C('codes').add({code:'NK-'+API.rnd(4).toUpperCase()+'-'+API.rnd(4).toUpperCase(),cid,used:''});toast('تم توليد '+n+' كود');render()}
+async function cpy(){const t=(await C('codes').list()).filter(c=>!c.used).map(c=>nm(c.cid)+': '+c.code).join('\n');try{await navigator.clipboard.writeText(t);toast('تم النسخ')}catch(e){md.innerHTML=`<div class="mb"><div class="glass pn mc"><textarea class="inp" rows="10" style="user-select:text">${esc(t)}</textarea><br><br><button class="btn" onclick="close()">إغلاق</button></div></div>`}}
+
+V.rq=async()=>{ST=await C('students').list();const rq=await C('reqs').list();return `<h2 class="st gt">طلبات الاشتراك</h2><div class="glass pn tw"><table class="tbl"><tr><th>الطالب</th><th>الكورس</th><th>التاريخ</th><th></th></tr>${rq.map(r=>{const s=ST.find(x=>x.id===r.sid)||{name:'—'};return `<tr><td>${esc(s.name)}</td><td>${esc(nm(r.cid))}</td><td>${D(r.t)}</td><td class="acts"><button class="btn s" onclick="rqA('${r.id}',1)">قبول</button><button class="btn s d" onclick="rqA('${r.id}',0)">رفض</button></td></tr>`}).join('')||'<tr><td colspan="4" class="sub">لا توجد طلبات معلّقة</td></tr>'}</table></div>`};
+async function rqA(id,ok){const r=(await C('reqs').list()).find(x=>x.id===id),s=(await C('students').list()).find(x=>x.id===r.sid);if(ok&&s&&!s.subs.includes(r.cid))await C('students').update(s.id,{subs:[...s.subs,r.cid]});await C('reqs').remove(id);render()}
+
+V.as=async()=>{const as=await C('assistants').list();return `<div class="top"><h2 class="st gt">المساعدون</h2><button class="btn" onclick="amodal()">+ مساعد</button></div><div class="glass pn tw"><table class="tbl"><tr><th>المساعد</th><th>الصلاحيات</th><th>الحالة</th><th></th></tr>${as.map(a=>`<tr><td><b>${esc(a.name)}</b><br><small class="sub">${esc(a.email)}</small></td><td>${a.perms.map(p=>esc(PERMS[p])).join('، ')||'—'}</td><td><span class="pill ${a.active?'on':'off'}">${a.active?'نشط':'موقوف'}</span></td><td class="acts"><button class="btn s g" onclick="amodal('${a.id}')">تعديل</button><button class="btn s g" onclick="aTg('${a.id}',${!a.active})">${a.active?'إيقاف':'تفعيل'}</button><button class="btn s d" onclick="aDel('${a.id}')">حذف</button></td></tr>`).join('')||'<tr><td colspan="4" class="sub">لا يوجد مساعدون</td></tr>'}</table></div>`};
+async function amodal(id){const a=id?(await C('assistants').list()).find(x=>x.id===id):{name:'',email:'',perms:[]};
+ md.innerHTML=`<div class="mb"><div class="glass pn mc"><h3>${id?'تعديل مساعد':'مساعد جديد'}</h3><label>الاسم<input class="inp" id="a_n" value="${esc(a.name)}"></label><label>البريد (للدخول)<input class="inp" id="a_e" style="direction:ltr" value="${esc(a.email)}"></label><h3>الصلاحيات</h3><div class="chk">${Object.entries(PERMS).map(([k,l])=>{const ok=!NEED[k]||has(NEED[k]);return `<label style="${ok?'':'opacity:.4'}"><input type="checkbox" class="ap" value="${k}" ${a.perms.includes(k)?'checked':''} ${ok?'':'disabled'}> ${l}${ok?'':' (غير متاحة في باقتك)'}</label>`}).join('')}</div><div class="row"><button class="btn" onclick="saveA('${id||''}')">حفظ</button><button class="btn g" onclick="close()">إلغاء</button></div></div></div>`}
+async function saveA(id){const n=$('#a_n').value.trim(),e=$('#a_e').value.trim(),perms=[...document.querySelectorAll('.ap:checked')].map(c=>c.value);if(!n||!/\S+@\S+/.test(e))return toast('اكتب الاسم وبريداً صحيحاً');
+ if(id){await C('assistants').update(id,{name:n,email:e,perms});close();return render()}
+ if((await C('assistants').list()).some(a=>a.email===e))return toast('البريد مستخدم');const pass=API.rnd(8);await C('assistants').add({name:n,email:e,pass,perms,active:true});close();await render();
+ md.innerHTML=`<div class="mb"><div class="glass pn mc"><h3>🔑 بيانات دخول المساعد</h3><div class="ln2">البريد<b>${esc(e)}</b></div><div class="ln2">كلمة المرور<b style="direction:ltr;user-select:text">${esc(pass)}</b></div><div class="ln2">رمز المنصة<b style="direction:ltr;user-select:text">${esc(TN.slug)}</b></div><br><button class="btn" onclick="close()">تم</button></div></div>`}
+async function aTg(id,v){await C('assistants').update(id,{active:v});render()}
+async function aDel(id){if(confirm('حذف المساعد؟')){await C('assistants').remove(id);render()}}
+
+V.an=async()=>{const a=await C('ann').list();return `<h2 class="st gt">إعلانات للطلاب</h2><div class="glass pn" style="margin-bottom:14px"><textarea class="inp" id="at" rows="3" placeholder="اكتب إعلاناً يظهر لطلابك"></textarea><button class="btn" style="margin-top:10px" onclick="addA()">نشر</button></div><div class="glass pn">${a.map(x=>`<div class="ln2"><span>${esc(x.x)}<br><small>${D(x.t)}</small></span><button class="btn s d" onclick="delA('${x.id}')">حذف</button></div>`).join('')||'<p class="sub">لا توجد إعلانات</p>'}</div>`};
+async function addA(){const x=$('#at').value.trim();if(x){await C('ann').add({x});render()}}
+async function delA(i){await C('ann').remove(i);render()}
+
+V.sg=async()=>`<h2 class="st gt">الإعدادات</h2><div class="two"><div class="glass pn"><h3>شروط وأحكام المنصة</h3><textarea class="inp" id="tm" rows="6">${esc(TN.terms)}</textarea><button class="btn" style="margin-top:10px" onclick="saveTm()">حفظ</button></div><div class="glass pn"><h3>تغيير كلمة المرور</h3><label>كلمة مرور جديدة<input class="inp" id="np" type="password"></label><button class="btn" onclick="savePw()">تغيير</button><p class="sub" style="margin-top:12px;font-size:13px">باقتك: ${API.PLANS[TN.plan].n} • ينتهي ${D(TN.expires)}</p></div></div>`;
+async function saveTm(){await API.tenants.update(TN.id,{terms:$('#tm').value.trim()});toast('تم الحفظ')}
+async function savePw(){const p=$('#np').value;if(p.length<8)return toast('8 أحرف على الأقل');await API.tenants.update(TN.id,{tpass:p});toast('تم تغيير كلمة المرور')}
+boot();
+</script>
+</body>
+</html>
